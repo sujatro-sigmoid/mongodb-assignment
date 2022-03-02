@@ -1,59 +1,30 @@
-
-from theaters.load_theaters_data import theatersData
-
-
-def insert_theatre(collections, theaterId, location):
-    collections.insert_one({'theaterId': theaterId,'location': location})
-
-
-def top_cities_with_maximum_theatres(collections):
-    dictionary = {}
-    for i in collections.find():
-        city = i['location']['address']['city']
-        if dictionary.get(city):
-            dictionary[city] +=1
-        else:
-            dictionary[city] = 1
-    a = sorted(dictionary.items(), key=lambda x: x[1], reverse=True)
-    return a[0:10]
+# 1. Top n cities with the maximum number of theaters
+def city_with_max_no_theaters(collection_theaters):
+    city = collection_theaters.aggregate([{"$group": {"_id": "$location.address.city", "count": {"$sum": 1}}},
+                                          {"$project": {"location.address.city": 1, "count": 1}},
+                                          {"$sort": {"count": -1}},
+                                          {"$limit": 10}])
+    for x in city:
+        print(x)
 
 
-def theatres_nearby_given_coordinates(collections,coord):
-    dictionary = {}
-    for i in collections.find():
-        cord_data = i['location']['geo']['coordinates']
-        x = float(coord[0]) - float(cord_data[0])
-        y = float(coord[1]) - float(cord_data[1])
-        x = round(x*x + y*y,5)
-        if dictionary.get(x):
-            dictionary[x].append(i['theaterId'])
-        else:
-            dictionary[x]=[]
-            dictionary[x].append(i['theaterId'])
-    a = dict(sorted(dictionary.items()))
-    ans = []
-    for k,v in a.items():
-        ans += v
-        if len(ans)+len(v)>10:
-            x = 10-len(ans)
-            ans += v[0:x]
-        else:
-            ans += v
-        if len(ans) >= 10:
-            break
-    return ans
-
-
+# 2. top 10 theatres nearby given coordinates
+def theaters_near_given_coordinates(collections, coord):
+    pipeline = [
+        {"$group": {"_id": {"city": "$location.address.city"}}},
+        {"$match": {"location.geo.coordinates[0]": coord[0], "location.geo.coordinates[1]": coord[1]}},
+        {"$limit": 10},
+        {"$project": {"city_name": "$_id.city", "_id": 0}}
+    ]
+    nearby = collections.aggregate(pipeline)
+    for x in nearby:
+        print(x)
 
 def theaters(db):
-    collections = db['theaters']
+    collection_theaters = db['theaters']
 
-    top_cities = top_cities_with_maximum_theatres(collections)
-    print("Top 10 cities with maximum theatres")
-    print(top_cities)
+    print("\n\n\n\n# 1. Top n cities with the maximum number of theaters")
+    city_with_max_no_theaters(collection_theaters)
 
-    lat = '-95.0000'
-    lon = '35.0000'
-    nearby_theatre = theatres_nearby_given_coordinates(collections,[lat,lon])
-    print(f"Top 10 theatres nearby given coordinates eg: [{lat}, {lon}]")
-    print(nearby_theatre)
+    print("\n\n\n\n# 2. top 10 theatres nearby given coordinates")
+    theaters_near_given_coordinates(collection_theaters, [-93.24565, 44.85466])
